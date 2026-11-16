@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#006A60" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ZapChat Android PWA</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts & Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Roboto', 'sans-serif'] },
+          colors: {
+            md: {
+              primary: '#006A60',
+              onPrimary: '#FFFFFF',
+              primaryContainer: '#9CF1E4',
+              onPrimaryContainer: '#00201C',
+              secondaryContainer: '#CCE8E2',
+              onSecondaryContainer: '#05201C',
+              surface: '#F4FBF8',
+              surfaceContainer: '#E9EFEC',
+              surfaceContainerHigh: '#E3EAE6',
+              onSurface: '#161D1B',
+              onSurfaceVariant: '#3F4946',
+              outline: '#6F7976',
+              outlineVariant: '#BEC9C5',
+              sentBubble: '#D9FDD3',
+              receivedBubble: '#FFFFFF',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #DDE5E1;
+      margin: 0;
+      padding: 0;
+      overscroll-behavior-y: none;
+    }
+    .material-symbols-rounded {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .chat-wallpaper {
+      background-color: #EFEAE2;
+      background-image: radial-gradient(#006A6014 1.2px, transparent 1.2px), radial-gradient(#006A600D 1.2px, #EFEAE2 1.2px);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: translateY(8px) scale(0.97); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .msg-anim { animation: popIn 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-anim { animation: slideUp 0.24s cubic-bezier(0.2, 0, 0, 1) forwards; }
+
+    .typing-dot { animation: typingBounce 1.4s infinite ease-in-out both; }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes typingBounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="h-[100dvh] w-screen overflow-hidden flex items-center justify-center">
+
+  <!-- Container Estilo Dispositivo Android / PWA -->
+  <div id="app-shell" class="relative w-full h-full md:max-w-[430px] md:h-[94dvh] md:rounded-[32px] md:shadow-2xl md:border-[6px] md:border-neutral-900 bg-md-surface overflow-hidden flex flex-col">
+
+    <!-- Status Bar Android Simulada (Desktop) -->
+    <div class="hidden md:flex items-center justify-between px-6 pt-2 pb-1 bg-md-primary text-md-onPrimary text-[11px] font-medium select-none">
+      <span id="android-clock">12:00</span>
+      <div class="w-16 h-3.5 bg-neutral-900 rounded-full"></div>
+      <div class="flex items-center gap-1">
+        <span class="material-symbols-rounded text-[14px]">signal_cellular_alt</span>
+        <span class="material-symbols-rounded text-[14px]">wifi</span>
+        <span class="material-symbols-rounded text-[14px]">battery_full</span>
+      </div>
+    </div>
+
+    <!-- Banner de Instalação PWA -->
+    <div id="pwa-install-banner" class="hidden bg-md-primaryContainer text-md-onPrimaryContainer px-4 py-2.5 flex items-center justify-between gap-2 border-b border-md-outlineVariant z-30">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="material-symbols-rounded text-md-primary">install_mobile</span>
+        <div class="truncate">
+          <p class="text-xs font-bold leading-tight">Instalar App no Android</p>
+          <p class="text-[11px] opacity-80 truncate">Adicione à tela inicial como PWA nativo</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btn-install-pwa" class="bg-md-primary text-md-onPrimary text-xs font-medium px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition">Instalar</button>
+        <button id="btn-dismiss-pwa" class="p-1 rounded-full hover:bg-black/10">
+          <span class="material-symbols-rounded text-[18px]">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TELA 1: CADASTRO LIMPO (ONBOARDING)        -->
+    <!-- ========================================== -->
+    <section id="screen-onboarding" class="hidden flex-1 flex flex-col justify-between p-6 bg-md-surface overflow-y-auto">
+      <div class="mt-4">
+        <div class="w-16 h-16 rounded-3xl bg-md-primary flex items-center justify-center text-md-onPrimary shadow-md mb-5">
+          <span class="material-symbols-rounded text-[36px]">forum</span>
+        </div>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-md-secondaryContainer text-md-onSecondaryContainer text-xs font-medium mb-3">
+          <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+          <span id="onboarding-sync-label">Android Social Chat PWA</span>
+        </div>
+        <h1 class="text-2xl font-bold text-md-onSurface tracking-tight">Bem-vindo ao ZapChat</h1>
+        <p class="text-sm text-md-onSurfaceVariant mt-1 leading-relaxed">
+          Crie seu perfil agora para enviar mensagens diretas instantâneas e criar grupos com link de convite.
+        </p>
+
+        <!-- Aviso se entrou via Link de Convite -->
+        <div id="onboarding-invite-notice" class="hidden mt-4 p-3.5 rounded-2xl bg-md-primaryContainer/70 border border-md-primary/30 flex items-center gap-3">
+          <span class="material-symbols-rounded text-md-primary">group_add</span>
+          <div class="text-xs text-md-onPrimaryContainer">
+            <p class="font-bold">Convite de grupo detectado!</p>
+            <p>Conclua seu registro para entrar automaticamente no grupo.</p>
+          </div>
+        </div>
+
+        <!-- Formulário de Registro -->
+        <form id="form-register" class="mt-6 space-y-4">
+          <div class="flex flex-col items-center gap-2">
+            <div class="relative">
+              <div id="reg-avatar-preview" class="w-20 h-20 rounded-full bg-md-primary text-white flex items-center justify-center text-2xl font-bold shadow-md overflow-hidden border-2 border-white">
+                ?
+              </div>
+              <label for="reg-photo-input" class="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-md-secondaryContainer text-md-onSecondaryContainer flex items-center justify-center shadow cursor-pointer border border-white">
+                <span class="material-symbols-rounded text-[16px]">photo_camera</span>
+              </label>
+              <input type="file" id="reg-photo-input" accept="image/*" class="hidden" />
+            </div>
+            <div class="flex items-center gap-2 mt-1" id="color-picker-row">
+              <button type="button" data-color="#006A60" class="color-swatch w-6 h-6 rounded-full bg-[#006A60] ring-2 ring-offset-2 ring-[#006A60]"></button>
+              <button type="button" data-color="#1E65F3" class="color-swatch w-6 h-6 rounded-full bg-[#1E65F3]"></button>
+              <button type="button" data-color="#8E24AA" class="color-swatch w-6 h-6 rounded-full bg-[#8E24AA]"></button>
+              <button type="button" data-color="#D84315" class="color-swatch w-6 h-6 rounded-full bg-[#D84315]"></button>
+              <button type="button" data-color="#2E7D32" class="color-swatch w-6 h-6 rounded-full bg-[#2E7D32]"></button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-1 ml-1">Nome de exibição *</label>
+            <input id="reg-name" type="text" required maxlength="32" placeholder="Ex: Carla Miter"
+              class="w-full px-4 py-3.5 rounded-2xl bg-md-surfaceContainerHigh text-md-onSurface text-sm outline-none focus:ring-2 focus:ring-md-primary transition" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-1 ml-1">Nome de usuário (@handle) *</label>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-md-outline text-sm font-medium">@</span>
+              <input id="reg-handle" type="text" required maxlength="22" placeholder="carlamiter"
+                class="w-full pl-8 pr-4 py-3.5 rounded-2xl bg-md-surfaceContainerHigh text-md-onSurface text-sm outline-none focus:ring-2 focus:ring-md-primary transition" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-1 ml-1">Recado / Bio</label>
+            <input id="reg-bio" type="text" maxlength="60" value="Disponível no ZapChat Android"
+              class="w-full px-4 py-3 rounded-2xl bg-md-surfaceContainerHigh text-md-onSurface text-sm outline-none focus:ring-2 focus:ring-md-primary transition" />
+          </div>
+
+          <button type="submit" id="btn-register-submit" class="w-full py-3.5 rounded-full bg-md-primary text-md-onPrimary font-medium text-sm shadow-md hover:brightness-105 active:scale-[0.98] transition flex items-center justify-center gap-2 mt-2">
+            <span>Entrar no Bate-Papo</span>
+            <span class="material-symbols-rounded text-[20px]">arrow_forward</span>
+          </button>
+        </form>
+      </div>
+
+      <p class="text-[11px] text-center text-md-outline mt-6">
+        Dica: Abra este app em outro aparelho ou nova aba para testar mensagens diretas e convites de grupo em tempo real.
+      </p>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TELA 2: LISTA DE CONVERSAS (HOME ANDROID)  -->
+    <!-- ========================================== -->
+    <section id="screen-home" class="hidden flex-1 flex flex-col bg-md-surface overflow-hidden">
+      <!-- Top App Bar Material 3 -->
+      <header class="bg-md-primary text-md-onPrimary px-4 pt-3 pb-3 shadow-sm shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="material-symbols-rounded text-[26px]">forum</span>
+            <div>
+              <h1 class="text-lg font-bold leading-none tracking-tight">ZapChat</h1>
+              <span id="sync-status-badge" class="text-[10px] opacity-85 flex items-center gap-1 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span> Conectando...
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button id="btn-open-join-modal" title="Entrar por link ou código" class="p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition">
+              <span class="material-symbols-rounded text-[22px]">link</span>
+            </button>
+            <button id="btn-open-new-group" title="Criar novo grupo" class="p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition">
+              <span class="material-symbols-rounded text-[22px]">group_add</span>
+            </button>
+            <button id="btn-open-profile" title="Meu Perfil" class="ml-1 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold overflow-hidden border border-white/40">
+              <span id="header-user-avatar">U</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Busca Material You -->
+        <div class="mt-3 relative">
+          <span class="material-symbols-rounded text-md-onSurfaceVariant text-[20px] absolute left-3.5 top-1/2 -translate-y-1/2">search</span>
+          <input id="search-chats" type="text" placeholder="Buscar conversas, pessoas ou grupos..."
+            class="w-full pl-10 pr-4 py-2 rounded-full bg-md-surface text-md-onSurface text-sm placeholder:text-md-outline outline-none shadow-inner" />
+        </div>
+      </header>
+
+      <!-- Chips de Filtro (Material 3 Filter Chips) -->
+      <div class="px-4 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-md-outlineVariant/40 shrink-0 bg-md-surface">
+        <button data-filter="all" class="filter-chip active px-3.5 py-1.5 rounded-full text-xs font-medium bg-md-secondaryContainer text-md-onSecondaryContainer transition">Todas</button>
+        <button data-filter="unread" class="filter-chip px-3.5 py-1.5 rounded-full text-xs font-medium bg-md-surfaceContainer text-md-onSurfaceVariant hover:bg-md-surfaceContainerHigh transition">Não lidas</button>
+        <button data-filter="dm" class="filter-chip px-3.5 py-1.5 rounded-full text-xs font-medium bg-md-surfaceContainer text-md-onSurfaceVariant hover:bg-md-surfaceContainerHigh transition">Diretas</button>
+        <button data-filter="group" class="filter-chip px-3.5 py-1.5 rounded-full text-xs font-medium bg-md-surfaceContainer text-md-onSurfaceVariant hover:bg-md-surfaceContainerHigh transition">Grupos</button>
+      </div>
+
+      <!-- Lista de Conversas -->
+      <div id="chat-list-container" class="flex-1 overflow-y-auto divide-y divide-md-outlineVariant/25"></div>
+
+      <!-- Extended FAB Material You -->
+      <div class="absolute bottom-5 right-5 flex flex-col items-end gap-2.5 z-20">
+        <button id="fab-new-chat" class="flex items-center gap-2 bg-md-primaryContainer text-md-onPrimaryContainer px-4 py-3.5 rounded-2xl shadow-lg hover:shadow-xl active:scale-95 transition font-medium text-sm">
+          <span class="material-symbols-rounded text-[22px]">chat_add_on</span>
+          <span>Nova Conversa</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TELA 3: SALA DE BATE-PAPO (DM / GRUPO)     -->
+    <!-- ========================================== -->
+    <section id="screen-chat" class="hidden flex-1 flex flex-col bg-md-surface overflow-hidden">
+      <!-- Top App Bar da Conversa -->
+      <header class="bg-md-primary text-md-onPrimary px-2 py-2.5 flex items-center justify-between shadow-sm shrink-0 z-10">
+        <div class="flex items-center gap-1.5 min-w-0 flex-1">
+          <button id="btn-back-home" class="p-2 rounded-full hover:bg-white/10 active:bg-white/20 shrink-0">
+            <span class="material-symbols-rounded text-[24px]">arrow_back</span>
+          </button>
+          <div id="chat-header-info" class="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer py-0.5 rounded-xl hover:bg-white/10 px-1.5 transition">
+            <div id="chat-avatar" class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+              A
+            </div>
+            <div class="min-w-0 flex-1">
+              <h2 id="chat-title" class="text-base font-bold leading-tight truncate">Nome do Contato</h2>
+              <p id="chat-subtitle" class="text-[11px] opacity-85 truncate">online agora</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-0.5 shrink-0">
+          <button id="btn-share-group-link" class="hidden p-2 rounded-full hover:bg-white/10 active:bg-white/20" title="Link de convite do grupo">
+            <span class="material-symbols-rounded text-[22px]">share</span>
+          </button>
+          <button id="btn-chat-details" class="p-2 rounded-full hover:bg-white/10 active:bg-white/20" title="Detalhes">
+            <span class="material-symbols-rounded text-[22px]">info</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Banner de Convite Rápido (Grupos) -->
+      <div id="group-invite-strip" class="hidden bg-md-primaryContainer/90 text-md-onPrimaryContainer px-3.5 py-2 flex items-center justify-between gap-2 text-xs border-b border-md-outlineVariant shrink-0">
+        <div class="flex items-center gap-2 truncate">
+          <span class="material-symbols-rounded text-[18px] text-md-primary">link</span>
+          <span class="truncate">Convite: <strong id="strip-invite-code" class="font-mono">GRP-XXXX</strong></span>
+        </div>
+        <button id="btn-copy-strip-link" class="bg-md-primary text-md-onPrimary px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 active:scale-95 transition">
+          Copiar Link
+        </button>
+      </div>
+
+      <!-- Área de Mensagens -->
+      <div id="messages-container" class="flex-1 overflow-y-auto p-3.5 space-y-2.5 chat-wallpaper flex flex-col"></div>
+
+      <!-- Barra de Resposta Rápida (Reply Preview) -->
+      <div id="reply-preview-bar" class="hidden bg-md-surfaceContainer px-3.5 py-2 border-t border-md-outlineVariant flex items-center justify-between gap-2 shrink-0">
+        <div class="border-l-4 border-md-primary pl-2.5 min-w-0 flex-1">
+          <p id="reply-preview-sender" class="text-[11px] font-bold text-md-primary truncate">Respondendo a</p>
+          <p id="reply-preview-text" class="text-xs text-md-onSurfaceVariant truncate">Mensagem...</p>
+        </div>
+        <button id="btn-cancel-reply" class="p-1 rounded-full hover:bg-black/10 text-md-onSurfaceVariant">
+          <span class="material-symbols-rounded text-[18px]">close</span>
+        </button>
+      </div>
+
+      <!-- Barra de Emojis Rápidos -->
+      <div id="emoji-drawer" class="hidden bg-md-surfaceContainer px-3 py-2 border-t border-md-outlineVariant flex items-center justify-between text-xl shrink-0">
+        <button type="button" class="emoji-btn hover:scale-125 transition">😀</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">😂</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">😍</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">🔥</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">👏</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">🚀</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">👍</button>
+        <button type="button" class="emoji-btn hover:scale-125 transition">❤️</button>
+      </div>
+
+      <!-- Barra de Envio de Mensagem -->
+      <form id="form-send-message" class="bg-md-surface px-2.5 py-2 flex items-end gap-2 border-t border-md-outlineVariant/50 shrink-0">
+        <div class="flex-1 bg-md-surfaceContainerHigh rounded-[26px] px-2 py-1 flex items-center gap-1 shadow-sm">
+          <button type="button" id="btn-toggle-emoji" class="p-2 rounded-full text-md-onSurfaceVariant hover:bg-black/5">
+            <span class="material-symbols-rounded text-[22px]">mood</span>
+          </button>
+          <input id="input-message" type="text" autocomplete="off" placeholder="Mensagem"
+            class="flex-1 bg-transparent text-sm text-md-onSurface placeholder:text-md-outline outline-none py-2 px-1" />
+          <label for="input-chat-image" class="p-2 rounded-full text-md-onSurfaceVariant hover:bg-black/5 cursor-pointer" title="Enviar imagem">
+            <span class="material-symbols-rounded text-[22px]">image</span>
+          </label>
+          <input type="file" id="input-chat-image" accept="image/*" class="hidden" />
+        </div>
+
+        <button type="submit" id="btn-send-msg" class="w-12 h-12 rounded-full bg-md-primary text-md-onPrimary flex items-center justify-center shadow-md active:scale-90 transition shrink-0">
+          <span class="material-symbols-rounded text-[22px]">send</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODAIS / BOTTOM SHEETS MATERIAL 3          -->
+    <!-- ========================================== -->
+    <div id="modal-backdrop" class="hidden absolute inset-0 bg-black/50 z-40 flex items-end justify-center">
+
+      <!-- Sheet: Nova Conversa Direta / Descobrir Pessoas -->
+      <div id="sheet-new-chat" class="hidden w-full bg-md-surface rounded-t-[28px] p-5 max-h-[82%] flex flex-col sheet-anim">
+        <div class="w-10 h-1 bg-md-outlineVariant rounded-full mx-auto mb-4"></div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-bold text-md-onSurface">Nova Conversa Direta</h3>
+          <button class="btn-close-modal p-1.5 rounded-full hover:bg-black/5">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+        <input id="search-users-input" type="text" placeholder="Buscar usuário por nome ou @handle..."
+          class="w-full px-4 py-2.5 rounded-2xl bg-md-surfaceContainerHigh text-sm outline-none mb-3" />
+        <div id="users-directory-list" class="flex-1 overflow-y-auto divide-y divide-md-outlineVariant/30"></div>
+      </div>
+
+      <!-- Sheet: Criar Novo Grupo -->
+      <div id="sheet-new-group" class="hidden w-full bg-md-surface rounded-t-[28px] p-5 max-h-[88%] overflow-y-auto sheet-anim">
+        <div class="w-10 h-1 bg-md-outlineVariant rounded-full mx-auto mb-4"></div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-md-onSurface">Criar Novo Grupo</h3>
+          <button class="btn-close-modal p-1.5 rounded-full hover:bg-black/5">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <form id="form-create-group" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-1">Nome do Grupo *</label>
+            <input id="group-name-input" type="text" required maxlength="36" placeholder="Ex: Equipe Android Dev"
+              class="w-full px-4 py-3 rounded-2xl bg-md-surfaceContainerHigh text-sm outline-none focus:ring-2 focus:ring-md-primary" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-1">Descrição do Grupo</label>
+            <input id="group-desc-input" type="text" maxlength="80" placeholder="Sobre o que vamos conversar?"
+              class="w-full px-4 py-3 rounded-2xl bg-md-surfaceContainerHigh text-sm outline-none focus:ring-2 focus:ring-md-primary" />
+          </div>
+
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-md-surfaceContainer">
+            <div>
+              <p class="text-xs font-bold text-md-onSurface">Visibilidade do Grupo</p>
+              <p id="group-visibility-desc" class="text-[11px] text-md-onSurfaceVariant">Público: visível na busca e acessível por link</p>
+            </div>
+            <select id="group-visibility-select" class="bg-md-primaryContainer text-md-onPrimaryContainer text-xs font-bold px-3 py-1.5 rounded-full outline-none">
+              <option value="public">Público</option>
+              <option value="private">Privado (Link)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-md-onSurfaceVariant mb-2">Adicionar Participantes (opcional)</label>
+            <div id="group-members-checkboxes" class="max-h-36 overflow-y-auto space-y-1.5 bg-md-surfaceContainer p-2.5 rounded-2xl"></div>
+          </div>
+
+          <button type="submit" class="w-full py-3.5 rounded-full bg-md-primary text-md-onPrimary font-medium text-sm shadow-md active:scale-95 transition">
+            Criar Grupo e Gerar Link
+          </button>
+        </form>
+      </div>
+
+      <!-- Sheet: Entrar via Link ou Código -->
+      <div id="sheet-join-group" class="hidden w-full bg-md-surface rounded-t-[28px] p-5 sheet-anim">
+        <div class="w-10 h-1 bg-md-outlineVariant rounded-full mx-auto mb-4"></div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-bold text-md-onSurface">Entrar em Grupo por Link</h3>
+          <button class="btn-close-modal p-1.5 rounded-full hover:bg-black/5">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+        <p class="text-xs text-md-onSurfaceVariant mb-4">
+          Cole o link de convite recebido ou digite o código do grupo (ex: <span class="font-mono font-bold">GRP-ANDROID</span>).
+        </p>
+        <form id="form-join-invite" class="space-y-4">
+          <input id="join-code-input" type="text" required placeholder="https://...?invite=GRP-XXXX ou GRP-XXXX"
+            class="w-full px-4 py-3 rounded-2xl bg-md-surfaceContainerHigh text-sm outline-none focus:ring-2 focus:ring-md-primary" />
+          <button type="submit" class="w-full py-3.5 rounded-full bg-md-primary text-md-onPrimary font-medium text-sm shadow-md active:scale-95 transition">
+            Entrar no Grupo Agora
+          </button>
+        </form>
+      </div>
+
+      <!-- Sheet: Detalhes da Conversa / Compartilhar Link -->
+      <div id="sheet-chat-details" class="hidden w-full bg-md-surface rounded-t-[28px] p-5 max-h-[85%] overflow-y-auto sheet-anim">
+        <div class="w-10 h-1 bg-md-outlineVariant rounded-full mx-auto mb-4"></div>
+        <div id="chat-details-content"></div>
+      </div>
+
+      <!-- Sheet: Perfil do Usuário -->
+      <div id="sheet-profile" class="hidden w-full bg-md-surface rounded-t-[28px] p-5 sheet-anim">
+        <div class="w-10 h-1 bg-md-outlineVariant rounded-full mx-auto mb-4"></div>
+        <div id="profile-sheet-content"></div>
+      </div>
+
+    </div>
+
+    <!-- Toast Android (Snackbar) -->
+    <div id="android-toast" class="hidden absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-900 text-white text-xs px-4 py-2.5 rounded-full shadow-xl z-50 whitespace-nowrap transition-opacity">
+      Mensagem copiada
+    </div>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- ENGINE DO APLICATIVO (CLOUD + OFFLINE)     -->
+  <!-- ========================================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc,
+      onSnapshot, query, where, orderBy, arrayUnion, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Preencha com suas credenciais do Firebase Console para sincronizar entre aparelhos reais
+    const firebaseConfig = {
+      apiKey: "",
+      authDomain: "",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: ""
+    };
+
+    const APP_ID = "zapchat-android-pwa-v2";
+    const SESSION_USER_KEY = "zapchat_session_user_v2";
+    const LOCAL_DB_KEY = "zapchat_local_fallback_v2";
+
+    // Estado Global
+    let useCloud = false;
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let activeChatId = null;
+    let activeFilter = "all";
+    let searchQuery = "";
+    let replyingTo = null;
+    let selectedRegColor = "#006A60";
+    let uploadedRegPhoto = null;
+    let deferredPrompt = null;
+    let typingTimeout = null;
+
+    let usersMap = new Map();
+    let chatsMap = new Map();
+    let messagesList = [];
+    let unsubUsers = null;
+    let unsubChats = null;
+    let unsubMessages = null;
+
+    // 1. PWA Manifest & Service Worker Dinâmicos
+    function setupPWA() {
+      const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#006A60"/><path d="M128 160h256c17.7 0 32 14.3 32 32v144c0 17.7-14.3 32-32 32H216l-72 56v-56h-16c-17.7 0-32-14.3-32-32V192c0-17.7 14.3-32 32-32z" fill="#9CF1E4"/></svg>`;
+      const iconUrl = "data:image/svg+xml;base64," + btoa(iconSvg);
+
+      const manifest = {
+        name: "ZapChat Android Social",
+        short_name: "ZapChat",
+        description: "Aplicativo social de mensagens diretas e grupos em tempo real",
+        start_url: location.href.split("?")[0],
+        display: "standalone",
+        background_color: "#F4FBF8",
+        theme_color: "#006A60",
+        orientation: "portrait",
+        icons: [
+          { src: iconUrl, sizes: "192x192", type: "image/svg+xml" },
+          { src: iconUrl, sizes: "512x512", type: "image/svg+xml" }
+        ]
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+      const manifestLink = document.createElement("link");
+      manifestLink.rel = "manifest";
+      manifestLink.href = URL.createObjectURL(manifestBlob);
+      document.head.appendChild(manifestLink);
+
+      if ("serviceWorker" in navigator) {
+        const swCode = `
+          const CACHE_NAME = 'zapchat-pwa-v2';
+          self.addEventListener('install', (e) => self.skipWaiting());
+          self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+          self.addEventListener('fetch', (e) => {
+            if (e.request.method !== 'GET') return;
+            e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+          });
+        `;
+        const swBlob = new Blob([swCode], { type: "application/javascript" });
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+      }
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById("pwa-install-banner").classList.remove("hidden");
+      });
+
+      document.getElementById("btn-install-pwa").addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        document.getElementById("pwa-install-banner").classList.add("hidden");
+      });
+
+      document.getElementById("btn-dismiss-pwa").addEventListener("click", () => {
+        document.getElementById("pwa-install-banner").classList.add("hidden");
+      });
+    }
+
+    // 2. Utilitários de UI e Áudio
+    function showToast(msg) {
+      const toast = document.getElementById("android-toast");
+      toast.textContent = msg;
+      toast.classList.remove("hidden");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => toast.classList.add("hidden"), 2800);
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatTime(ts) {
+      if (!ts) return "";
+      const date = ts.toDate ? ts.toDate() : new Date(ts);
+      return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function getInitials(name) {
+      return (name || "?")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(p => p[0]?.toUpperCase() || "")
+        .join("");
+    }
+
+    function renderAvatar(entity, sizeClass = "w-11 h-11 text-sm") {
+      if (!entity) return `<div class="${sizeClass} rounded-full bg-md-primary text-white flex items-center justify-center font-bold">?</div>`;
+      if (entity.photo) {
+        return `<img src="${entity.photo}" alt="${escapeHtml(entity.name)}" class="${sizeClass} rounded-full object-cover" />`;
+      }
+      const bg = entity.color || "#006A60";
+      return `<div style="background:${bg}" class="${sizeClass} rounded-full text-white flex items-center justify-center font-bold select-none">${getInitials(entity.name)}</div>`;
+    }
+
+    function playPopSound(freq = 560) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.04, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.09);
+      } catch (_) {}
+    }
+
+    function compressImage(file, maxW = 480) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const scale = Math.min(1, maxW / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.72));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 3. Camada de Dados (Nuvem Firebase com Fallback Local Multi-Aba)
+    function getLocalStore() {
+      const raw = localStorage.getItem(LOCAL_DB_KEY);
+      if (raw) return JSON.parse(raw);
+      const seed = {
+        users: {
+          "bot_ana": {
+            id: "bot_ana",
+            name: "Ana Paula (Suporte)",
+            handle: "anapaula",
+            bio: "Online no ZapChat Android",
+            color: "#1E65F3",
+            photo: null,
+            online: true
+          },
+          "bot_lucas": {
+            id: "bot_lucas",
+            name: "Lucas Dev Android",
+            handle: "lucasdev",
+            bio: "Kotlin, Jetpack Compose & PWAs",
+            color: "#8E24AA",
+            photo: null,
+            online: true
+          }
+        },
+        chats: {
+          "grp_welcome": {
+            id: "grp_welcome",
+            type: "group",
+            name: "Comunidade Android Brasil",
+            description: "Grupo oficial de boas-vindas do ZapChat",
+            visibility: "public",
+            inviteCode: "GRP-ANDROID",
+            color: "#006A60",
+            members: ["bot_ana", "bot_lucas"],
+            lastMessage: "Bem-vindo! Compartilhe o link deste grupo.",
+            lastMessageAt: Date.now() - 120000,
+            unreadBy: {}
+          }
+        },
+        messages: {
+          "grp_welcome": [
+            {
+              id: "m_seed_1",
+              senderId: "bot_ana",
+              senderName: "Ana Paula (Suporte)",
+              text: "Olá! Este é um grupo público. Você pode criar seu próprio grupo, gerar um link de convite e conversar em tempo real.",
+              createdAt: Date.now() - 180000
+            }
+          ]
+        }
+      };
+      localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(seed));
+      return seed;
+    }
+
+    function saveLocalStore(data) {
+      localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(data));
+      window.dispatchEvent(new Event("local-db-updated"));
+    }
+
+    async function initBackend() {
+      const hasConfig = firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId;
+      if (hasConfig) {
+        try {
+          const app = initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          db = getFirestore(app);
+          await signInAnonymously(auth);
+          useCloud = true;
+          updateSyncBadge(true);
+          return;
+        } catch (err) {
+          console.warn("Fallback para modo local:", err);
+        }
+      }
+      useCloud = false;
+      updateSyncBadge(false);
+    }
+
+    function updateSyncBadge(isCloud) {
+      const badge = document.getElementById("sync-status-badge");
+      const onboardLabel = document.getElementById("onboarding-sync-label");
+      if (isCloud) {
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span> Nuvem Tempo Real`;
+        onboardLabel.textContent = "Sincronizado na Nuvem";
+      } else {
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-300"></span> Modo Local / Multi-Aba`;
+        onboardLabel.textContent = "Android PWA (Modo Local)";
+      }
+    }
+
+    // 4. Sincronização de Usuários, Conversas e Mensagens
+    function startDataListeners() {
+      if (useCloud) {
+        const usersCol = collection(db, "artifacts", APP_ID, "public", "data", "users");
+        unsubUsers = onSnapshot(usersCol, (snap) => {
+          usersMap.clear();
+          snap.forEach(d => usersMap.set(d.id, { id: d.id, ...d.data() }));
+          renderChatList();
+          if (activeChatId) updateChatHeader();
+        });
+
+        const chatsCol = collection(db, "artifacts", APP_ID, "public", "data", "chats");
+        unsubChats = onSnapshot(chatsCol, (snap) => {
+          chatsMap.clear();
+          snap.forEach(d => {
+            const c = { id: d.id, ...d.data() };
+            if ((c.members && c.members.includes(currentUser.id)) || c.visibility === "public") {
+              chatsMap.set(d.id, c);
+            }
+          });
+          renderChatList();
+          if (activeChatId) updateChatHeader();
+        });
+      } else {
+        const syncLocal = () => {
+          const store = getLocalStore();
+          usersMap.clear();
+          Object.values(store.users).forEach(u => usersMap.set(u.id, u));
+
+          chatsMap.clear();
+          Object.values(store.chats).forEach(c => {
+            if ((c.members && c.members.includes(currentUser.id)) || c.visibility === "public") {
+              chatsMap.set(c.id, c);
+            }
+          });
+          renderChatList();
+          if (activeChatId) {
+            messagesList = store.messages[activeChatId] || [];
+            renderMessages();
+            updateChatHeader();
+          }
+        };
+        syncLocal();
+        window.addEventListener("storage", syncLocal);
+        window.addEventListener("local-db-updated", syncLocal);
+      }
+    }
+
+    async function registerUser(name, handle, bio) {
+      const cleanHandle = handle.replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9._]/g, "");
+      const uid = (useCloud && auth?.currentUser?.uid) ? auth.currentUser.uid : "usr_" + Math.random().toString(36).slice(2, 10);
+
+      const userObj = {
+        id: uid,
+        name: name.trim(),
+        handle: cleanHandle || "usuario",
+        bio: bio.trim() || "Disponível no ZapChat",
+        color: selectedRegColor,
+        photo: uploadedRegPhoto,
+        online: true,
+        updatedAt: Date.now()
+      };
+
+      if (useCloud) {
+        await setDoc(doc(db, "artifacts", APP_ID, "public", "data", "users", uid), userObj, { merge: true });
+      } else {
+        const store = getLocalStore();
+        store.users[uid] = userObj;
+        // Cria DM inicial de boas-vindas
+        const dmId = [uid, "bot_ana"].sort().join("__");
+        if (!store.chats[dmId]) {
+          store.chats[dmId] = {
+            id: dmId,
+            type: "dm",
+            members: [uid, "bot_ana"],
+            lastMessage: "Olá! Bem-vindo ao ZapChat PWA 👋",
+            lastMessageAt: Date.now(),
+            unreadBy: { [uid]: 1 }
+          };
+          store.messages[dmId] = [{
+            id: "m_welcome_" + Date.now(),
+            senderId: "bot_ana",
+            senderName: "Ana Paula (Suporte)",
+            text: "Olá! Bem-vindo ao ZapChat PWA 👋 Me mande uma mensagem ou crie um grupo para compartilhar o link!",
+            createdAt: Date.now()
+          }];
+        }
+        saveLocalStore(store);
+      }
+
+      sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(userObj));
+      currentUser = userObj;
+    }
+
+    // 5. Navegação e Telas
+    function showScreen(screenId) {
+      ["screen-onboarding", "screen-home", "screen-chat"].forEach(id => {
+        document.getElementById(id).classList.add("hidden");
+      });
+      document.getElementById(screenId).classList.remove("hidden");
+    }
+
+    function updateHeaderProfile() {
+      if (!currentUser) return;
+      const el = document.getElementById("header-user-avatar");
+      if (currentUser.photo) {
+        el.innerHTML = `<img src="${currentUser.photo}" class="w-full h-full object-cover" />`;
+      } else {
+        el.textContent = getInitials(currentUser.name);
+        el.style.backgroundColor = currentUser.color || "#006A60";
+      }
+    }
+
+    // 6. Renderização da Lista de Conversas
+    function getChatDisplayInfo(chat) {
+      if (chat.type === "group") {
+        return {
+          name: chat.name,
+          subtitle: chat.lastMessage || chat.description || `${(chat.members || []).length} participantes`,
+          avatarEntity: { name: chat.name, color: chat.color || "#006A60", photo: null },
+          online: false
+        };
+      }
+      const otherId = (chat.members || []).find(id => id !== currentUser.id) || currentUser.id;
+      const otherUser = usersMap.get(otherId) || { name: "Usuário", handle: "user", color: "#006A60" };
+      return {
+        name: otherUser.name,
+        subtitle: chat.lastMessage || `@${otherUser.handle}`,
+        avatarEntity: otherUser,
+        online: !!otherUser.online
+      };
+    }
+
+    function renderChatList() {
+      const container = document.getElementById("chat-list-container");
+      const allChats = Array.from(chatsMap.values()).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+
+      const filtered = allChats.filter(chat => {
+        const info = getChatDisplayInfo(chat);
+        const unreadCount = (chat.unreadBy && chat.unreadBy[currentUser.id]) || 0;
+        if (activeFilter === "unread" && unreadCount === 0) return false;
+        if (activeFilter === "dm" && chat.type !== "dm") return false;
+        if (activeFilter === "group" && chat.type !== "group") return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return info.name.toLowerCase().includes(q) || info.subtitle.toLowerCase().includes(q);
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-64 px-6 text-center text-md-onSurfaceVariant">
+            <span class="material-symbols-rounded text-[48px] text-md-outline mb-2">chat_bubble_outline</span>
+            <p class="text-sm font-medium">Nenhuma conversa encontrada</p>
+            <p class="text-xs opacity-75 mt-1">Toque em "Nova Conversa" ou crie um grupo para começar.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(chat => {
+        const info = getChatDisplayInfo(chat);
+        const unreadCount = (chat.unreadBy && chat.unreadBy[currentUser.id]) || 0;
+        const isGroup = chat.type === "group";
+        const isMember = (chat.members || []).includes(currentUser.id);
+
+        return `
+          <div data-chat-id="${chat.id}" class="chat-row px-4 py-3 flex items-center gap-3.5 hover:bg-md-surfaceContainer/70 active:bg-md-surfaceContainerHigh cursor-pointer transition">
+            <div class="relative shrink-0">
+              ${renderAvatar(info.avatarEntity, "w-12 h-12 text-base")}
+              ${info.online ? `<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-md-surface"></span>` : ""}
+              ${isGroup ? `<span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-md-primary text-white flex items-center justify-center ring-2 ring-md-surface"><span class="material-symbols-rounded text-[11px]">group</span></span>` : ""}
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <h3 class="text-[15px] font-bold text-md-onSurface truncate">${escapeHtml(info.name)}</h3>
+                <span class="text-[11px] ${unreadCount > 0 ? "text-md-primary font-bold" : "text-md-outline"} shrink-0">
+                  ${formatTime(chat.lastMessageAt)}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-2 mt-0.5">
+                <p class="text-xs text-md-onSurfaceVariant truncate">${escapeHtml(info.subtitle)}</p>
+                ${!isMember && isGroup
+                  ? `<span class="px-2 py-0.5 rounded-full bg-md-primaryContainer text-md-onPrimaryContainer text-[10px] font-bold shrink-0">Entrar</span>`
+                  : unreadCount > 0
+                    ? `<span class="min-w-[20px] h-5 px-1.5 rounded-full bg-md-primary text-md-onPrimary text-[11px] font-bold flex items-center justify-center shrink-0">${unreadCount}</span>`
+                    : ""
+                }
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".chat-row").forEach(row => {
+        row.addEventListener("click", () => openChat(row.dataset.chatId));
+      });
+    }
+
+    // 7. Abrir Sala de Conversa (DM ou Grupo)
+    async function openChat(chatId) {
+      activeChatId = chatId;
+      replyingTo = null;
+      document.getElementById("reply-preview-bar").classList.add("hidden");
+      document.getElementById("emoji-drawer").classList.add("hidden");
+
+      const chat = chatsMap.get(chatId);
+      if (chat && chat.type === "group" && !(chat.members || []).includes(currentUser.id)) {
+        await joinGroupById(chatId);
+      }
+
+      // Zera contador de não lidas
+      if (useCloud) {
+        await updateDoc(doc(db, "artifacts", APP_ID, "public", "data", "chats", chatId), {
+          [`unreadBy.${currentUser.id}`]: 0
+        }).catch(() => {});
+      } else {
+        const store = getLocalStore();
+        if (store.chats[chatId]) {
+          store.chats[chatId].unreadBy = store.chats[chatId].unreadBy || {};
+          store.chats[chatId].unreadBy[currentUser.id] = 0;
+          saveLocalStore(store);
+        }
+      }
+
+      updateChatHeader();
+      showScreen("screen-chat");
+
+      if (unsubMessages) {
+        unsubMessages();
+        unsubMessages = null;
+      }
+
+      if (useCloud) {
+        const msgsCol = collection(db, "artifacts", APP_ID, "public", "data", "chats", chatId, "messages");
+        const q = query(msgsCol, orderBy("createdAt", "asc"));
+        unsubMessages = onSnapshot(q, (snap) => {
+          messagesList = [];
+          snap.forEach(d => messagesList.push({ id: d.id, ...d.data() }));
+          renderMessages();
+        });
+      } else {
+        const store = getLocalStore();
+        messagesList = store.messages[chatId] || [];
+        renderMessages();
+      }
+    }
+
+    function updateChatHeader() {
+      const chat = chatsMap.get(activeChatId);
+      if (!chat) return;
+      const info = getChatDisplayInfo(chat);
+
+      document.getElementById("chat-title").textContent = info.name;
+      document.getElementById("chat-avatar").innerHTML = renderAvatar(info.avatarEntity, "w-10 h-10 text-sm");
+
+      const typingUsers = Object.entries(chat.typing || {})
+        .filter(([uid, isTyping]) => uid !== currentUser.id && isTyping)
+        .map(([uid]) => usersMap.get(uid)?.name?.split(" ")[0] || "Alguém");
+
+      if (typingUsers.length > 0) {
+        document.getElementById("chat-subtitle").textContent = `${typingUsers.join(", ")} digitando...`;
+      } else if (chat.type === "group") {
+        document.getElementById("chat-subtitle").textContent = `${(chat.members || []).length} membros • ${chat.visibility === "private" ? "Privado" : "Público"}`;
+      } else {
+        document.getElementById("chat-subtitle").textContent = info.online ? "online agora" : "visto recentemente";
+      }
+
+      const shareBtn = document.getElementById("btn-share-group-link");
+      const inviteStrip = document.getElementById("group-invite-strip");
+      if (chat.type === "group") {
+        shareBtn.classList.remove("hidden");
+        inviteStrip.classList.remove("hidden");
+        document.getElementById("strip-invite-code").textContent = chat.inviteCode || chat.id;
+      } else {
+        shareBtn.classList.add("hidden");
+        inviteStrip.classList.add("hidden");
+      }
+    }
+
+    function renderMessages() {
+      const container = document.getElementById("messages-container");
+      const chat = chatsMap.get(activeChatId);
+      const isGroup = chat?.type === "group";
+
+      if (messagesList.length === 0) {
+        container.innerHTML = `
+          <div class="my-auto mx-auto bg-white/85 backdrop-blur-sm px-4 py-2.5 rounded-2xl text-center max-w-[260px] shadow-sm">
+            <p class="text-xs text-md-onSurfaceVariant">Nenhuma mensagem ainda. Diga oi para iniciar a conversa!</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = messagesList.map(m => {
+        const isMine = m.senderId === currentUser.id;
+        return `
+          <div class="flex flex-col ${isMine ? "items-end" : "items-start"} msg-anim">
+            <div data-msg-id="${m.id}" class="msg-bubble max-w-[82%] rounded-2xl px-3.5 py-2 shadow-sm relative group cursor-pointer ${
+              isMine
+                ? "bg-md-sentBubble text-md-onSurface rounded-tr-sm"
+                : "bg-md-receivedBubble text-md-onSurface rounded-tl-sm"
+            }">
+              ${!isMine && isGroup ? `<p class="text-[11px] font-bold text-md-primary mb-0.5">${escapeHtml(m.senderName)}</p>` : ""}
+
+              ${m.replyTo ? `
+                <div class="mb-1.5 pl-2 border-l-2 border-md-primary bg-black/5 rounded-r-lg py-1 pr-2 text-[11px]">
+                  <p class="font-bold text-md-primary truncate">${escapeHtml(m.replyTo.senderName)}</p>
+                  <p class="text-md-onSurfaceVariant truncate">${escapeHtml(m.replyTo.text)}</p>
+                </div>
+              ` : ""}
+
+              ${m.image ? `<img src="${m.image}" class="rounded-xl max-h-52 w-auto object-cover mb-1.5 border border-black/5" />` : ""}
+              ${m.text ? `<p class="text-[14px] leading-snug break-words whitespace-pre-wrap">${escapeHtml(m.text)}</p>` : ""}
+
+              <div class="flex items-center justify-end gap-1 mt-1">
+                <span class="text-[10px] text-md-outline">${formatTime(m.createdAt)}</span>
+                ${isMine ? `<span class="material-symbols-rounded text-[14px] text-sky-600">done_all</span>` : ""}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".msg-bubble").forEach(el => {
+        el.addEventListener("click", () => {
+          const msg = messagesList.find(item => item.id === el.dataset.msgId);
+          if (!msg) return;
+          replyingTo = {
+            id: msg.id,
+            senderName: msg.senderName || "Mensagem",
+            text: msg.text || "📷 Imagem"
+          };
+          document.getElementById("reply-preview-sender").textContent = `Respondendo a ${replyingTo.senderName}`;
+          document.getElementById("reply-preview-text").textContent = replyingTo.text;
+          document.getElementById("reply-preview-bar").classList.remove("hidden");
+          document.getElementById("input-message").focus();
+        });
+      });
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // 8. Envio de Mensagens e Respostas Simuladas
+    async function sendMessage(text, imageData = null) {
+      if (!activeChatId || (!text && !imageData)) return;
+      const chat = chatsMap.get(activeChatId);
+      if (!chat) return;
+
+      const msgPayload = {
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: text || "",
+        image: imageData || null,
+        replyTo: replyingTo,
+        createdAt: Date.now()
+      };
+
+      replyingTo = null;
+      document.getElementById("reply-preview-bar").classList.add("hidden");
+      playPopSound(620);
+
+      const previewText = imageData ? (text ? `📷 ${text}` : "📷 Foto") : text;
+
+      if (useCloud) {
+        const msgsCol = collection(db, "artifacts", APP_ID, "public", "data", "chats", activeChatId, "messages");
+        await addDoc(msgsCol, msgPayload);
+
+        const unreadUpdates = {};
+        (chat.members || []).forEach(uid => {
+          if (uid !== currentUser.id) {
+            unreadUpdates[`unreadBy.${uid}`] = ((chat.unreadBy && chat.unreadBy[uid]) || 0) + 1;
+          }
+        });
+
+        await updateDoc(doc(db, "artifacts", APP_ID, "public", "data", "chats", activeChatId), {
+          lastMessage: previewText,
+          lastMessageAt: Date.now(),
+          [`typing.${currentUser.id}`]: false,
+          ...unreadUpdates
+        });
+      } else {
+        const store = getLocalStore();
+        const msgId = "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+        store.messages[activeChatId] = store.messages[activeChatId] || [];
+        store.messages[activeChatId].push({ id: msgId, ...msgPayload });
+
+        const targetChat = store.chats[activeChatId];
+        if (targetChat) {
+          targetChat.lastMessage = previewText;
+          targetChat.lastMessageAt = Date.now();
+          targetChat.unreadBy = targetChat.unreadBy || {};
+          (targetChat.members || []).forEach(uid => {
+            if (uid !== currentUser.id) {
+              targetChat.unreadBy[uid] = (targetChat.unreadBy[uid] || 0) + 1;
+            }
+          });
+        }
+        saveLocalStore(store);
+
+        // Resposta automática interativa caso fale com contatos de demonstração
+        const otherId = (chat.members || []).find(id => id !== currentUser.id);
+        if (chat.type === "dm" && (otherId === "bot_ana" || otherId === "bot_lucas")) {
+          triggerBotReply(activeChatId, otherId, text);
+        }
+      }
+    }
+
+    function triggerBotReply(chatId, botId, userText) {
+      const bot = usersMap.get(botId);
+      if (!bot) return;
+      setTimeout(() => {
+        const store = getLocalStore();
+        if (!store.chats[chatId]) return;
+        const replies = [
+          `Recebi sua mensagem: "${userText || "Foto enviada"}"! Tudo funcionando em tempo real no PWA.`,
+          "Boa! Experimente também criar um grupo e abrir o link de convite em outra aba ou aparelho.",
+          "Interface Material You pronta para Android! Precisa de mais algum ajuste?"
+        ];
+        const replyText = replies[Math.floor(Math.random() * replies.length)];
+        store.messages[chatId].push({
+          id: "m_bot_" + Date.now(),
+          senderId: botId,
+          senderName: bot.name,
+          text: replyText,
+          createdAt: Date.now()
+        });
+        store.chats[chatId].lastMessage = replyText;
+        store.chats[chatId].lastMessageAt = Date.now();
+        if (activeChatId !== chatId) {
+          store.chats[chatId].unreadBy[currentUser.id] = (store.chats[chatId].unreadBy[currentUser.id] || 0) + 1;
+        }
+        saveLocalStore(store);
+        playPopSound(480);
+      }, 900);
+    }
+
+    // 9. Criação de DM e Grupos com Convite por Link
+    async function startDirectMessage(targetUserId) {
+      if (targetUserId === currentUser.id) return;
+      const dmId = [currentUser.id, targetUserId].sort().join("__");
+
+      if (!chatsMap.has(dmId)) {
+        const newDm = {
+          id: dmId,
+          type: "dm",
+          members: [currentUser.id, targetUserId],
+          lastMessage: "",
+          lastMessageAt: Date.now(),
+          unreadBy: {}
+        };
+        if (useCloud) {
+          await setDoc(doc(db, "artifacts", APP_ID, "public", "data", "chats", dmId), newDm);
+        } else {
+          const store = getLocalStore();
+          store.chats[dmId] = newDm;
+          store.messages[dmId] = store.messages[dmId] || [];
+          saveLocalStore(store);
+        }
+      }
+
+      closeAllModals();
+      openChat(dmId);
+    }
+
+    async function createGroup(name, description, visibility, memberIds) {
+      const inviteCode = "GRP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+      const groupId = "grp_" + Date.now().toString(36);
+      const uniqueMembers = Array.from(new Set([currentUser.id, ...memberIds]));
+      const colors = ["#006A60", "#1E65F3", "#8E24AA", "#D84315", "#2E7D32"];
+
+      const groupObj = {
+        id: groupId,
+        type: "group",
+        name: name.trim(),
+        description: description.trim() || "Grupo criado no ZapChat",
+        visibility,
+        inviteCode,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        createdBy: currentUser.id,
+        members: uniqueMembers,
+        lastMessage: `${currentUser.name} criou o grupo`,
+        lastMessageAt: Date.now(),
+        unreadBy: {}
+      };
+
+      const systemMsg = {
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: `Grupo "${groupObj.name}" criado! Compartilhe o link com código ${inviteCode} para convidar pessoas.`,
+        createdAt: Date.now()
+      };
+
+      if (useCloud) {
+        await setDoc(doc(db, "artifacts", APP_ID, "public", "data", "chats", groupId), groupObj);
+        await addDoc(collection(db, "artifacts", APP_ID, "public", "data", "chats", groupId, "messages"), systemMsg);
+      } else {
+        const store = getLocalStore();
+        store.chats[groupId] = groupObj;
+        store.messages[groupId] = [{ id: "m_sys_" + Date.now(), ...systemMsg }];
+        saveLocalStore(store);
+      }
+
+      closeAllModals();
+      showToast("Grupo criado! Link de convite pronto.");
+      openChat(groupId);
+    }
+
+    function buildInviteUrl(inviteCode) {
+      const url = new URL(window.location.href.split("?")[0]);
+      url.searchParams.set("invite", inviteCode);
+      return url.toString();
+    }
+
+    async function copyInviteLink(inviteCode) {
+      const link = buildInviteUrl(inviteCode);
+      try {
+        await navigator.clipboard.writeText(link);
+        showToast("Link de convite copiado!");
+      } catch (_) {
+        showToast(`Código: ${inviteCode}`);
+      }
+    }
+
+    async function joinGroupByCodeOrLink(rawInput) {
+      let code = rawInput.trim();
+      try {
+        if (code.includes("invite=")) {
+          const u = new URL(code);
+          code = u.searchParams.get("invite") || code;
+        }
+      } catch (_) {
+        const match = code.match(/invite=([A-Za-z0-9-_]+)/);
+        if (match) code = match[1];
+      }
+      code = code.toUpperCase();
+
+      if (useCloud) {
+        const chatsCol = collection(db, "artifacts", APP_ID, "public", "data", "chats");
+        const q = query(chatsCol, where("inviteCode", "==", code));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          showToast("Convite não encontrado.");
+          return false;
+        }
+        const groupDoc = snap.docs[0];
+        await joinGroupById(groupDoc.id);
+        closeAllModals();
+        openChat(groupDoc.id);
+        return true;
+      } else {
+        const store = getLocalStore();
+        const found = Object.values(store.chats).find(
+          c => c.type === "group" && ((c.inviteCode || "").toUpperCase() === code || c.id.toUpperCase() === code)
+        );
+        if (!found) {
+          showToast("Convite não encontrado.");
+          return false;
+        }
+        await joinGroupById(found.id);
+        closeAllModals();
+        openChat(found.id);
+        return true;
+      }
+    }
+
+    async function joinGroupById(groupId) {
+      if (useCloud) {
+        await updateDoc(doc(db, "artifacts", APP_ID, "public", "data", "chats", groupId), {
+          members: arrayUnion(currentUser.id),
+          lastMessage: `${currentUser.name} entrou pelo link de convite`,
+          lastMessageAt: Date.now()
+        });
+      } else {
+        const store = getLocalStore();
+        const grp = store.chats[groupId];
+        if (grp && !grp.members.includes(currentUser.id)) {
+          grp.members.push(currentUser.id);
+          grp.lastMessage = `${currentUser.name} entrou pelo link de convite`;
+          grp.lastMessageAt = Date.now();
+          store.messages[groupId] = store.messages[groupId] || [];
+          store.messages[groupId].push({
+            id: "m_join_" + Date.now(),
+            senderId: currentUser.id,
+            senderName: currentUser.name,
+            text: `${currentUser.name} entrou no grupo usando o link de convite.`,
+            createdAt: Date.now()
+          });
+          saveLocalStore(store);
+        }
+      }
+      showToast("Você entrou no grupo!");
+    }
+
+    // 10. Gerenciamento de Modais / Bottom Sheets
+    function openModal(sheetId) {
+      document.getElementById("modal-backdrop").classList.remove("hidden");
+      ["sheet-new-chat", "sheet-new-group", "sheet-join-group", "sheet-chat-details", "sheet-profile"].forEach(id => {
+        document.getElementById(id).classList.add("hidden");
+      });
+      document.getElementById(sheetId).classList.remove("hidden");
+    }
+
+    function closeAllModals() {
+      document.getElementById("modal-backdrop").classList.add("hidden");
+    }
+
+    function renderUsersDirectory(filter = "") {
+      const list = document.getElementById("users-directory-list");
+      const others = Array.from(usersMap.values()).filter(u => {
+        if (u.id === currentUser.id) return false;
+        if (!filter) return true;
+        const q = filter.toLowerCase();
+        return u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q);
+      });
+
+      if (others.length === 0) {
+        list.innerHTML = `<p class="text-xs text-center text-md-outline py-6">Nenhum outro usuário encontrado.</p>`;
+        return;
+      }
+
+      list.innerHTML = others.map(u => `
+        <div data-uid="${u.id}" class="dir-user-row py-2.5 px-2 flex items-center justify-between hover:bg-md-surfaceContainer rounded-xl cursor-pointer">
+          <div class="flex items-center gap-3 min-w-0">
+            ${renderAvatar(u, "w-10 h-10 text-sm")}
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-md-onSurface truncate">${escapeHtml(u.name)}</p>
+              <p class="text-xs text-md-onSurfaceVariant truncate">@${escapeHtml(u.handle)} • ${escapeHtml(u.bio || "")}</p>
+            </div>
+          </div>
+          <span class="material-symbols-rounded text-md-primary">chat</span>
+        </div>
+      `).join("");
+
+      list.querySelectorAll(".dir-user-row").forEach(row => {
+        row.addEventListener("click", () => startDirectMessage(row.dataset.uid));
+      });
+    }
+
+    function renderGroupMembersCheckboxes() {
+      const box = document.getElementById("group-members-checkboxes");
+      const others = Array.from(usersMap.values()).filter(u => u.id !== currentUser.id);
+      if (others.length === 0) {
+        box.innerHTML = `<p class="text-xs text-md-outline">Você poderá convidar membros depois via link.</p>`;
+        return;
+      }
+      box.innerHTML = others.map(u => `
+        <label class="flex items-center justify-between p-1.5 rounded-xl hover:bg-black/5 cursor-pointer">
+          <div class="flex items-center gap-2.5">
+            ${renderAvatar(u, "w-7 h-7 text-xs")}
+            <span class="text-xs font-medium text-md-onSurface">${escapeHtml(u.name)}</span>
+          </div>
+          <input type="checkbox" value="${u.id}" class="grp-member-cb accent-[#006A60] w-4 h-4" />
+        </label>
+      `).join("");
+    }
+
+    function openChatDetailsSheet() {
+      const chat = chatsMap.get(activeChatId);
+      if (!chat) return;
+      const content = document.getElementById("chat-details-content");
+
+      if (chat.type === "group") {
+        const inviteUrl = buildInviteUrl(chat.inviteCode || chat.id);
+        const membersHtml = (chat.members || []).map(uid => {
+          const u = usersMap.get(uid) || { name: "Participante", handle: "user" };
+          return `
+            <div class="flex items-center justify-between py-2">
+              <div class="flex items-center gap-2.5">
+                ${renderAvatar(u, "w-9 h-9 text-xs")}
+                <div>
+                  <p class="text-xs font-bold text-md-onSurface">${escapeHtml(u.name)} ${uid === currentUser.id ? "(Você)" : ""}</p>
+                  <p class="text-[11px] text-md-onSurfaceVariant">@${escapeHtml(u.handle)}</p>
+                </div>
+              </div>
+              ${uid === chat.createdBy ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-md-secondaryContainer text-md-onSecondaryContainer font-bold">Admin</span>` : ""}
+            </div>
+          `;
+        }).join("");
+
+        content.innerHTML = `
+          <div class="flex flex-col items-center text-center mb-4">
+            ${renderAvatar({ name: chat.name, color: chat.color }, "w-16 h-16 text-xl")}
+            <h3 class="text-lg font-bold text-md-onSurface mt-2">${escapeHtml(chat.name)}</h3>
+            <p class="text-xs text-md-onSurfaceVariant">${escapeHtml(chat.description || "")}</p>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-md-primaryContainer/60 border border-md-primary/20 mb-4">
+            <p class="text-xs font-bold text-md-onPrimaryContainer mb-1">Link de Convite do Grupo</p>
+            <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-md-outlineVariant/50">
+              <input type="text" readonly value="${inviteUrl}" class="flex-1 text-xs text-md-onSurface outline-none bg-transparent font-mono" />
+              <button id="btn-modal-copy-link" class="bg-md-primary text-md-onPrimary text-xs px-3 py-1 rounded-full font-medium shrink-0">Copiar</button>
+            </div>
+            <p class="text-[11px] text-md-onPrimaryContainer/80 mt-1.5">Código direto: <strong>${chat.inviteCode || chat.id}</strong></p>
+          </div>
+
+          <h4 class="text-xs font-bold text-md-onSurfaceVariant uppercase tracking-wider mb-1">Participantes (${(chat.members || []).length})</h4>
+          <div class="divide-y divide-md-outlineVariant/30">${membersHtml}</div>
+        `;
+
+        openModal("sheet-chat-details");
+        document.getElementById("btn-modal-copy-link").addEventListener("click", () => copyInviteLink(chat.inviteCode || chat.id));
+      } else {
+        const info = getChatDisplayInfo(chat);
+        content.innerHTML = `
+          <div class="flex flex-col items-center text-center py-4">
+            ${renderAvatar(info.avatarEntity, "w-20 h-20 text-2xl")}
+            <h3 class="text-lg font-bold text-md-onSurface mt-3">${escapeHtml(info.name)}</h3>
+            <p class="text-xs text-md-primary font-medium">@${escapeHtml(info.avatarEntity.handle || "usuario")}</p>
+            <p class="text-xs text-md-onSurfaceVariant mt-2 max-w-xs">${escapeHtml(info.avatarEntity.bio || "Disponível no ZapChat")}</p>
+          </div>
+        `;
+        openModal("sheet-chat-details");
+      }
+    }
+
+    function openProfileSheet() {
+      const content = document.getElementById("profile-sheet-content");
+      content.innerHTML = `
+        <div class="flex flex-col items-center text-center">
+          ${renderAvatar(currentUser, "w-20 h-20 text-2xl")}
+          <h3 class="text-lg font-bold text-md-onSurface mt-3">${escapeHtml(currentUser.name)}</h3>
+          <p class="text-xs text-md-primary font-medium">@${escapeHtml(currentUser.handle)}</p>
+          <p class="text-xs text-md-onSurfaceVariant mt-1">${escapeHtml(currentUser.bio || "")}</p>
+
+          <div class="w-full mt-5 space-y-2.5">
+            <button id="btn-logout-session" class="w-full py-3 rounded-full bg-rose-100 text-rose-800 font-medium text-xs hover:bg-rose-200 transition">
+              Sair / Registrar Outro Usuário nesta Aba
+            </button>
+          </div>
+        </div>
+      `;
+      openModal("sheet-profile");
+      document.getElementById("btn-logout-session").addEventListener("click", () => {
+        sessionStorage.removeItem(SESSION_USER_KEY);
+        location.reload();
+      });
+    }
+
+    // 11. Eventos de Interface e Inicialização
+    function bindEvents() {
+      // Relógio Android
+      const updateClock = () => {
+        document.getElementById("android-clock").textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      };
+      updateClock();
+      setInterval(updateClock, 30000);
+
+      // Cores e Foto no Cadastro
+      document.querySelectorAll(".color-swatch").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".color-swatch").forEach(b => b.classList.remove("ring-2", "ring-offset-2"));
+          btn.classList.add("ring-2", "ring-offset-2");
+          selectedRegColor = btn.dataset.color;
+          const prev = document.getElementById("reg-avatar-preview");
+          if (!uploadedRegPhoto) prev.style.backgroundColor = selectedRegColor;
+        });
+      });
+
+      document.getElementById("reg-name").addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        const prev = document.getElementById("reg-avatar-preview");
+        if (!uploadedRegPhoto) prev.textContent = val ? getInitials(val) : "?";
+        const handleInput = document.getElementById("reg-handle");
+        if (!handleInput.dataset.touched) {
+          handleInput.value = val.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+        }
+      });
+
+      document.getElementById("reg-handle").addEventListener("input", (e) => {
+        e.target.dataset.touched = "true";
+      });
+
+      document.getElementById("reg-photo-input").addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        uploadedRegPhoto = await compressImage(file, 240);
+        document.getElementById("reg-avatar-preview").innerHTML = `<img src="${uploadedRegPhoto}" class="w-full h-full object-cover" />`;
+      });
+
+      // Submit Cadastro Limpo
+      document.getElementById("form-register").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("btn-register-submit");
+        btn.disabled = true;
+        const name = document.getElementById("reg-name").value;
+        const handle = document.getElementById("reg-handle").value;
+        const bio = document.getElementById("reg-bio").value;
+
+        await registerUser(name, handle, bio);
+        updateHeaderProfile();
+        startDataListeners();
+        showScreen("screen-home");
+
+        const pendingInvite = new URLSearchParams(window.location.search).get("invite");
+        if (pendingInvite) {
+          setTimeout(() => joinGroupByCodeOrLink(pendingInvite), 400);
+        }
+      });
+
+      // Busca e Filtros Home
+      document.getElementById("search-chats").addEventListener("input", (e) => {
+        searchQuery = e.target.value;
+        renderChatList();
+      });
+
+      document.querySelectorAll(".filter-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll(".filter-chip").forEach(c => {
+            c.classList.remove("active", "bg-md-secondaryContainer", "text-md-onSecondaryContainer");
+            c.classList.add("bg-md-surfaceContainer", "text-md-onSurfaceVariant");
+          });
+          chip.classList.add("active", "bg-md-secondaryContainer", "text-md-onSecondaryContainer");
+          chip.classList.remove("bg-md-surfaceContainer", "text-md-onSurfaceVariant");
+          activeFilter = chip.dataset.filter;
+          renderChatList();
+        });
+      });
+
+      // Botões Top Bar & FAB
+      document.getElementById("fab-new-chat").addEventListener("click", () => {
+        renderUsersDirectory();
+        openModal("sheet-new-chat");
+      });
+
+      document.getElementById("search-users-input").addEventListener("input", (e) => {
+        renderUsersDirectory(e.target.value);
+      });
+
+      document.getElementById("btn-open-new-group").addEventListener("click", () => {
+        renderGroupMembersCheckboxes();
+        openModal("sheet-new-group");
+      });
+
+      document.getElementById("group-visibility-select").addEventListener("change", (e) => {
+        document.getElementById("group-visibility-desc").textContent =
+          e.target.value === "public"
+            ? "Público: visível na busca e acessível por link"
+            : "Privado: acesso exclusivo via link ou código de convite";
+      });
+
+      document.getElementById("form-create-group").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("group-name-input").value;
+        const desc = document.getElementById("group-desc-input").value;
+        const visibility = document.getElementById("group-visibility-select").value;
+        const members = Array.from(document.querySelectorAll(".grp-member-cb:checked")).map(cb => cb.value);
+        await createGroup(name, desc, visibility, members);
+        e.target.reset();
+      });
+
+      document.getElementById("btn-open-join-modal").addEventListener("click", () => {
+        openModal("sheet-join-group");
+      });
+
+      document.getElementById("form-join-invite").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const code = document.getElementById("join-code-input").value;
+        await joinGroupByCodeOrLink(code);
+        e.target.reset();
+      });
+
+      document.getElementById("btn-open-profile").addEventListener("click", openProfileSheet);
+
+      // Navegação Sala de Chat
+      document.getElementById("btn-back-home").addEventListener("click", () => {
+        activeChatId = null;
+        if (unsubMessages) {
+          unsubMessages();
+          unsubMessages = null;
+        }
+        showScreen("screen-home");
+        renderChatList();
+      });
+
+      document.getElementById("btn-share-group-link").addEventListener("click", () => {
+        const chat = chatsMap.get(activeChatId);
+        if (chat) copyInviteLink(chat.inviteCode || chat.id);
+      });
+
+      document.getElementById("btn-copy-strip-link").addEventListener("click", () => {
+        const chat = chatsMap.get(activeChatId);
+        if (chat) copyInviteLink(chat.inviteCode || chat.id);
+      });
+
+      document.getElementById("btn-chat-details").addEventListener("click", openChatDetailsSheet);
+      document.getElementById("chat-header-info").addEventListener("click", openChatDetailsSheet);
+
+      // Envio de Mensagens, Emojis e Imagens
+      document.getElementById("form-send-message").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const input = document.getElementById("input-message");
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = "";
+        await sendMessage(text);
+      });
+
+      document.getElementById("input-message").addEventListener("input", () => {
+        if (!useCloud || !activeChatId || !currentUser) return;
+        const chatRef = doc(db, "artifacts", APP_ID, "public", "data", "chats", activeChatId);
+        updateDoc(chatRef, { [`typing.${currentUser.id}`]: true }).catch(() => {});
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          updateDoc(chatRef, { [`typing.${currentUser.id}`]: false }).catch(() => {});
+        }, 1800);
+      });
+
+      document.getElementById("input-chat-image").addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const imgBase64 = await compressImage(file, 520);
+        await sendMessage("", imgBase64);
+        e.target.value = "";
+      });
+
+      document.getElementById("btn-toggle-emoji").addEventListener("click", () => {
+        document.getElementById("emoji-drawer").classList.toggle("hidden");
+      });
+
+      document.querySelectorAll(".emoji-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const input = document.getElementById("input-message");
+          input.value += btn.textContent;
+          input.focus();
+        });
+      });
+
+      document.getElementById("btn-cancel-reply").addEventListener("click", () => {
+        replyingTo = null;
+        document.getElementById("reply-preview-bar").classList.add("hidden");
+      });
+
+      // Fechar Modais
+      document.querySelectorAll(".btn-close-modal").forEach(btn => btn.addEventListener("click", closeAllModals));
+      document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+        if (e.target.id === "modal-backdrop") closeAllModals();
+      });
+    }
+
+    // Boot da Aplicação
+    (async function boot() {
+      setupPWA();
+      bindEvents();
+      await initBackend();
+
+      const savedSession = sessionStorage.getItem(SESSION_USER_KEY);
+      const inviteParam = new URLSearchParams(window.location.search).get("invite");
+
+      if (savedSession) {
+        currentUser = JSON.parse(savedSession);
+        updateHeaderProfile();
+        startDataListeners();
+        showScreen("screen-home");
+        if (inviteParam) {
+          setTimeout(() => joinGroupByCodeOrLink(inviteParam), 400);
+        }
+      } else {
+        if (inviteParam) {
+          document.getElementById("onboarding-invite-notice").classList.remove("hidden");
+        }
+        showScreen("screen-onboarding");
+      }
+    })();
+  </script>
+</body>
+</html>
